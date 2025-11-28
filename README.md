@@ -50,6 +50,8 @@ bbctl server start
 
 Agents can mirror scan events into a Neo4j database alongside the BBOT server output. Start the agent with `--neo4j-output` and configure the connection details under `agent.neo4j_output` in your BBOT server config (e.g. `~/.config/bbot_server/config.yml`).
 
+Events ingested directly into the server (for example via `bbctl event ingest` or POSTing to `/api/events/`) are mirrored to Neo4j automatically **only if** an agent is online with `--neo4j-output`; the agent does the forwarding while it processes events from the server. If no such agent is running, ingested events stay in the server database and never reach Neo4j. To ensure findings, vulnerabilities, or other ad-hoc ingests are exported, keep at least one agent online with Neo4j output enabled.
+
 ```bash
 bbctl agent start --id <AGENT_ID> --name <AGENT_NAME> --neo4j-output
 ```
@@ -342,6 +344,12 @@ bbctl finding list
 
 # Search findings for a certain string
 bbctl finding list --search "IIS"
+
+# Mark a finding as a false positive (ignored)
+bbctl finding ignore <finding-id>
+
+# Remove the ignored flag if it was set in error
+bbctl finding ignore <finding-id> --unignore
 ```
 
 ### Statistics
