@@ -21,5 +21,6 @@ Example:
 NEXT_PUBLIC_BBOT_API=http://localhost:8807/v1 NEXT_PUBLIC_BBOT_API_KEY=example npm run dev
 ```
 
-The landing page uses server components to pull `/assets/hosts` and `/events/list` every 30 seconds, surfacing
-asset summaries and recent event activity in a shadcn-themed layout.
+The landing page uses server components to pull `/assets/hosts`, `/events/list`, `/assets/stats`,
+`/assets/technologies/summarize`, `/assets/open_ports/list`, and `/scans/targets/count` every 30 seconds, surfacing
+asset summaries, KPIs for targets/technologies/ports, and recent event activity in a shadcn-themed layout.

@@ -1,5 +1,6 @@
 import { AssetTable } from "@/components/dashboard/asset-table";
 import { EventFeed } from "@/components/dashboard/event-feed";
+import { InsightCharts } from "@/components/dashboard/insight-charts";
 import { OverviewCards } from "@/components/dashboard/overview-cards";
 import { Button } from "@/components/ui/button";
 import { loadDashboardData } from "@/lib/utils";
@@ -25,6 +26,8 @@ export default async function DashboardPage() {
       </header>
 
       <OverviewCards overview={overview} insights={insights} />
+
+      <InsightCharts insights={insights} />
 
       <section className="grid gap-6 xl:grid-cols-[1.25fr_1fr]">
         <AssetTable assets={overview.highlighted_assets} />

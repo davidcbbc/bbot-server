@@ -30,9 +30,30 @@ export interface EventRecord {
 }
 
 export interface InsightResponse {
-  totals: { assets: number; events: number };
+  totals: {
+    assets: number;
+    events: number;
+    targets: number;
+    technologies: number;
+    open_ports: number;
+    hosts_with_open_ports: number;
+  };
   severity_breakdown: Record<string, number>;
   asset_categories: Record<string, number>;
+  technologies: TechnologySummary[];
+  open_ports: PortInsight[];
+}
+
+export interface TechnologySummary {
+  technology: string;
+  hosts: string[];
+  last_seen?: string;
+}
+
+export interface PortInsight {
+  port: string;
+  hosts: string[];
+  count: number;
 }
 
 async function parseJsonWithNdjsonFallback(response: Response) {
@@ -75,6 +96,15 @@ export async function fetchFromBbot<T>(path: string, options?: RequestInit): Pro
 
   const payload = await parseJsonWithNdjsonFallback(response);
   return payload as T;
+}
+
+async function safeFetchFromBbot<T>(path: string, fallback: T): Promise<T> {
+  try {
+    return await fetchFromBbot<T>(path);
+  } catch (error) {
+    console.error(`[dashboard] failed to load ${path}:`, error);
+    return fallback;
+  }
 }
 
 function extractRecords(payload: unknown): unknown[] {
@@ -121,12 +151,59 @@ function normalizeEvent(record: unknown): EventRecord {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function normalizeTechnologySummary(value: unknown): TechnologySummary[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return undefined;
+      const record = entry as Record<string, unknown>;
+      const technology = record.technology;
+      const hosts = Array.isArray(record.hosts) ? record.hosts.map(String) : [];
+      if (typeof technology !== "string") return undefined;
+      return { technology, hosts, last_seen: typeof record.last_seen === "string" ? record.last_seen : undefined };
+    })
+    .filter(Boolean) as TechnologySummary[];
+}
+
+function normalizePortInsights(hostsToPorts: unknown): PortInsight[] {
+  if (!isRecord(hostsToPorts)) return [];
+
+  const portToHosts = Object.entries(hostsToPorts).reduce<Record<string, Set<string>>>((acc, [host, ports]) => {
+    if (!Array.isArray(ports)) return acc;
+    ports.forEach((portValue) => {
+      const port = String(portValue);
+      if (!acc[port]) acc[port] = new Set<string>();
+      acc[port].add(host);
+    });
+    return acc;
+  }, {});
+
+  return Object.entries(portToHosts)
+    .map(([port, hosts]) => ({ port, hosts: Array.from(hosts).sort(), count: hosts.size }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function normalizeStats(stats: unknown) {
+  if (!isRecord(stats)) return {} as Record<string, unknown>;
+  return stats;
+}
+
 export async function loadDashboardData(limit = 50): Promise<{ overview: OverviewResponse; insights: InsightResponse }> {
   const query = limit ? `?limit=${limit}` : "";
-  const [hostsPayload, eventsPayload] = await Promise.all([
-    fetchFromBbot<unknown>(`/assets/hosts${query}`),
-    fetchFromBbot<unknown>(`/events/list${query}`),
-  ]);
+  const [hostsPayload, eventsPayload, statsPayload, technologiesPayload, openPortsPayload, targetsPayload] =
+    await Promise.all([
+      fetchFromBbot<unknown>(`/assets/hosts${query}`),
+      fetchFromBbot<unknown>(`/events/list${query}`),
+      safeFetchFromBbot<Record<string, unknown>>("/assets/stats", {}),
+      safeFetchFromBbot<unknown>(`/assets/technologies/summarize${query}`, []),
+      safeFetchFromBbot<unknown>(`/assets/open_ports/list${query}`, {}),
+      safeFetchFromBbot<number>("/scans/targets/count", 0),
+    ]);
 
   const hosts = extractRecords(hostsPayload).map(normalizeAsset);
   const events = extractRecords(eventsPayload).map(normalizeEvent);
@@ -134,11 +211,7 @@ export async function loadDashboardData(limit = 50): Promise<{ overview: Overvie
   const highlighted_assets = hosts.slice(0, 5);
   const recent_events = events.slice(0, 10);
 
-  const overview: OverviewResponse = {
-    asset_count: hosts.length,
-    highlighted_assets,
-    recent_events,
-  };
+  const overview: OverviewResponse = { asset_count: hosts.length, highlighted_assets, recent_events };
 
   const severity_breakdown = events.reduce<Record<string, number>>((acc, event) => {
     const severity = (event.severity ?? "unknown").toLowerCase();
@@ -152,10 +225,33 @@ export async function loadDashboardData(limit = 50): Promise<{ overview: Overvie
     return acc;
   }, {});
 
+  const stats = normalizeStats(statsPayload);
+  const statsTechnologies = normalizeTechnologySummary(technologiesPayload);
+  const open_ports = normalizePortInsights(openPortsPayload);
+
+  const openPortHosts = new Set<string>();
+  open_ports.forEach((port) => port.hosts.forEach((host) => openPortHosts.add(host)));
+
+  const technologyCountFromStats = (() => {
+    const techs = (stats as Record<string, unknown>)["technologies"];
+    return isRecord(techs) ? Object.keys(techs).length : 0;
+  })();
+
+  const totals = {
+    assets: hosts.length,
+    events: events.length,
+    targets: typeof targetsPayload === "number" ? targetsPayload : 0,
+    technologies: statsTechnologies.length || technologyCountFromStats,
+    open_ports: open_ports.reduce((sum, port) => sum + port.count, 0),
+    hosts_with_open_ports: openPortHosts.size,
+  };
+
   const insights: InsightResponse = {
-    totals: { assets: hosts.length, events: events.length },
+    totals,
     severity_breakdown,
     asset_categories,
+    technologies: statsTechnologies,
+    open_ports,
   };
 
   return { overview, insights };
