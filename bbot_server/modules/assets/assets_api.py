@@ -43,6 +43,24 @@ class AssetsApplet(BaseApplet):
             history.append(activity["description"])
         return history
 
+    @api_endpoint("/{host}/tag", methods=["POST"], summary="Add a tag to an asset")
+    async def tag_asset(self, host: str, tag: str = "false_positive") -> Asset:
+        asset = await self._get_asset(host=host)
+        if not asset:
+            raise self.BBOTServerNotFoundError(f"Asset {host} not found")
+        tags = set(asset.get("tags", []))
+        tags.add(tag)
+        await self._update_asset(host, {"tags": sorted(tags), "modified": utc_now()})
+        return await self.get_asset(host)
+
+    @api_endpoint("/{host}/ignore", methods=["POST"], summary="Ignore or unignore an asset")
+    async def set_asset_ignore(self, host: str, ignored: bool = True) -> Asset:
+        asset = await self._get_asset(host=host)
+        if not asset:
+            raise self.BBOTServerNotFoundError(f"Asset {host} not found")
+        await self._update_asset(host, {"ignored": ignored, "modified": utc_now()})
+        return await self.get_asset(host)
+
     async def update_asset(self, asset: Asset):
         asset.modified = utc_now()
         await self.strict_collection.update_one({"host": asset.host}, {"$set": asset.model_dump()}, upsert=True)

@@ -25,6 +25,7 @@ class BaseAssetFacet(BaseBBOTServerModel):
     port: Annotated[Optional[int], "indexed"] = None
     netloc: Annotated[Optional[str], "indexed"] = None
     url: Annotated[Optional[str], "indexed"] = None
+    tags: Annotated[list[str], "indexed", "indexed-text"] = []
     created: Annotated[float, "indexed"] = Field(default_factory=utc_now)
     modified: Annotated[float, "indexed"] = Field(default_factory=utc_now)
     ignored: bool = False

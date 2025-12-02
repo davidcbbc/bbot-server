@@ -44,6 +44,11 @@ class EventsApplet(BaseApplet):
     async def archive_event(self, uuid: str):
         await self.event_store.archive_event(uuid)
 
+    @api_endpoint("/{uuid}/tag", methods=["POST"], summary="Add a tag to an event")
+    async def tag_event(self, uuid: str, tag: str = "false_positive") -> Event:
+        await self.event_store.add_event_tag(uuid, tag)
+        return await self.event_store.get_event(uuid)
+
     @api_endpoint("/archive", methods=["POST"], summary="Archive old events")
     async def archive_old_events(
         self,

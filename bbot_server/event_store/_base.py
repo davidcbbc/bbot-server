@@ -31,6 +31,9 @@ class BaseEventStore(BaseDB):
             older_than = self.archive_after_timestamp
         return await self._archive_events(older_than)
 
+    async def add_event_tag(self, uuid: str, tag: str):
+        await self._add_event_tag(uuid, tag)
+
     async def clear(self, confirm):
         await self._clear(confirm)
 
@@ -38,6 +41,9 @@ class BaseEventStore(BaseDB):
         raise NotImplementedError()
 
     async def _archive_events(self, uuid):
+        raise NotImplementedError()
+
+    async def _add_event_tag(self, uuid, tag):
         raise NotImplementedError()
 
     async def _get_events(self):

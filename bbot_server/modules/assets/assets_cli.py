@@ -74,3 +74,21 @@ class AssetCTL(BaseBBCTL):
     ):
         stats = self.bbot_server.get_stats(domain=domain, target_id=target)
         self.print_raw_line(self.orjson.dumps(stats))
+
+    @subcommand(help="Add a tag to an asset (default: false_positive)")
+    def tag(
+        self,
+        host: str,
+        tag: Annotated[str, Option("--tag", "-t", help="Tag to add to the asset")] = "false_positive",
+    ):
+        asset = self.bbot_server.tag_asset(host=host, tag=tag)
+        self.print_pydantic_json(asset)
+
+    @subcommand(help="Ignore or unignore an asset")
+    def ignore(
+        self,
+        host: str,
+        unignore: Annotated[bool, Option("--unignore", "-u", help="Remove the ignore flag instead of setting it")] = False,
+    ):
+        asset = self.bbot_server.set_asset_ignore(host=host, ignored=not unignore)
+        self.print_pydantic_json(asset)
