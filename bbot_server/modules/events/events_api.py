@@ -22,6 +22,14 @@ class EventsApplet(BaseApplet):
         # write the event to the database
         await self.event_store.insert_event(event)
 
+        # best-effort forward to Neo4j when configured
+        neo4j_forwarder = getattr(self.root, "neo4j_forwarder", None)
+        if neo4j_forwarder is not None:
+            try:
+                await neo4j_forwarder.forward_event(event)
+            except Exception as e:
+                self.log.error(f"Error forwarding event {event.uuid} to Neo4j: {e}")
+
     @api_endpoint("/", methods=["POST"], summary="Insert a BBOT event into the asset database")
     async def insert_event(self, event: Event):
         """

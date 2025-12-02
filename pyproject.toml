@@ -25,6 +25,7 @@ taskiq-redis = "^1.0.3"
 fastapi-mcp = "^0.3.3"
 cloudcheck = "^7.2.0"
 bbot = {git = "https://github.com/blacklanternsecurity/bbot", rev = "3.0"}
+neo4j = "^5.26.0"
 # pinning these as the latest versions are bugged
 click = "8.1.8"
 mcp = "1.7.0"
