@@ -13,6 +13,7 @@ Environment variables:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from dataclasses import dataclass
 from functools import lru_cache
@@ -114,7 +115,21 @@ async def fetch_remote(path: str, settings: Settings) -> Any:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:  # pragma: no cover - passthrough for caller
         raise HTTPException(status_code=exc.response.status_code, detail=str(exc))
-    return response.json()
+
+    try:
+        return response.json()
+    except json.JSONDecodeError:
+        # Some BBOT endpoints (e.g., logs/events) can return newline-delimited JSON.
+        lines = [line.strip() for line in response.text.splitlines() if line.strip()]
+        parsed_lines: list[Any] = []
+        for line in lines:
+            try:
+                parsed_lines.append(json.loads(line))
+            except json.JSONDecodeError as exc:  # pragma: no cover - defensive fallback
+                raise HTTPException(status_code=502, detail=f"Invalid JSON from BBOT API: {exc}")
+        if parsed_lines:
+            return parsed_lines
+        raise HTTPException(status_code=502, detail="Empty response from BBOT API")
 
 
 def _extract_records(payload: Any) -> list[Any]:
