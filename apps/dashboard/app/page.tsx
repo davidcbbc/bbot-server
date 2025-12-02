@@ -2,18 +2,10 @@ import { AssetTable } from "@/components/dashboard/asset-table";
 import { EventFeed } from "@/components/dashboard/event-feed";
 import { OverviewCards } from "@/components/dashboard/overview-cards";
 import { Button } from "@/components/ui/button";
-import { fetchFromBackend, type InsightResponse, type OverviewResponse } from "@/lib/utils";
-
-async function getData() {
-  const [overview, insights] = await Promise.all([
-    fetchFromBackend<OverviewResponse>("/overview"),
-    fetchFromBackend<InsightResponse>("/insights")
-  ]);
-  return { overview, insights };
-}
+import { loadDashboardData } from "@/lib/utils";
 
 export default async function DashboardPage() {
-  const { overview, insights } = await getData();
+  const { overview, insights } = await loadDashboardData();
 
   return (
     <main className="mx-auto flex max-w-7xl flex-col gap-8 p-8">
@@ -21,7 +13,9 @@ export default async function DashboardPage() {
         <div>
           <p className="text-sm uppercase tracking-wider text-muted-foreground">BBOT Server</p>
           <h1 className="text-4xl font-bold tracking-tight">Command center</h1>
-          <p className="text-muted-foreground">A Shadcn flavored Next.js dashboard backed by a FastAPI proxy.</p>
+          <p className="text-muted-foreground">
+            A Shadcn flavored Next.js dashboard that talks directly to the BBOT REST API.
+          </p>
         </div>
         <Button asChild>
           <a href="https://github.com/blacklanternsecurity/bbot-server" target="_blank" rel="noreferrer">

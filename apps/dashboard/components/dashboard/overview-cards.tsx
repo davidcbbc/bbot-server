@@ -72,9 +72,14 @@ export function OverviewCards({ overview, insights }: OverviewCardsProps) {
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           {topSeverity.length ? (
             topSeverity.map(([severity, count]) => (
-              <div key={severity} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-foreground">
+              <div
+                key={severity}
+                className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-foreground"
+              >
                 <span className="capitalize">{severity}</span>
-                <Badge variant={severity === "critical" || severity === "high" ? "destructive" : "secondary"}>{count}</Badge>
+                <Badge variant={severity === "critical" || severity === "high" ? "destructive" : "secondary"}>
+                  {count}
+                </Badge>
               </div>
             ))
           ) : (
@@ -90,12 +95,12 @@ export function OverviewCards({ overview, insights }: OverviewCardsProps) {
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            The dashboard pairs a Next.js front end with a FastAPI bridge that reshapes BBOT data into UI-friendly snapshots.
+            The dashboard now hits the BBOT REST API directly, reshaping the responses into quick UI snapshots.
           </p>
           <Separator />
           <div className="flex items-center gap-3">
             <Gauge className="h-6 w-6 text-primary" />
-            <p className="text-foreground">Tweak the datasource via NEXT_PUBLIC_DASHBOARD_API.</p>
+            <p className="text-foreground">Point it at your server via NEXT_PUBLIC_BBOT_API and NEXT_PUBLIC_BBOT_API_KEY.</p>
           </div>
         </CardContent>
       </Card>

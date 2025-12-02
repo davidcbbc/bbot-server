@@ -1,24 +1,6 @@
 # BBOT Dashboard (Next.js + shadcn)
 
-A lightweight dashboard that pairs a FastAPI bridge with a shadcn-styled Next.js front end. The FastAPI service shapes BBOT
-Server data into UI-friendly responses, and the UI renders them as live metrics, tables, and event feeds.
-
-## Running the FastAPI bridge
-
-```bash
-# install server deps via poetry or pip
-poetry install --with dev
-poetry run uvicorn dashboard_backend.main:app --reload
-# or
-python -m pip install -e .
-uvicorn dashboard_backend.main:app --reload
-```
-
-Environment variables:
-
-- `DASHBOARD_BBOT_API_URL` (default `http://localhost:8807/v1`)
-- `DASHBOARD_BBOT_API_KEY` (API key for BBOT Server)
-- `DASHBOARD_DEFAULT_LIMIT` (optional default page size)
+A lightweight dashboard that uses the BBOT Server REST API directly, showing live metrics, tables, and event feeds.
 
 ## Running the Next.js UI
 
@@ -28,11 +10,16 @@ npm install
 npm run dev
 ```
 
-Configure the UI to point at the FastAPI bridge by setting `NEXT_PUBLIC_DASHBOARD_API`, for example:
+Configure the UI to point at your BBOT server by setting:
+
+- `NEXT_PUBLIC_BBOT_API` (default `http://localhost:8807/v1`)
+- `NEXT_PUBLIC_BBOT_API_KEY` (API key for BBOT Server)
+
+Example:
 
 ```bash
-NEXT_PUBLIC_DASHBOARD_API=http://localhost:8000 npm run dev
+NEXT_PUBLIC_BBOT_API=http://localhost:8807/v1 NEXT_PUBLIC_BBOT_API_KEY=example npm run dev
 ```
 
-The landing page uses server components to pull `/overview` and `/insights` from the bridge every 30 seconds, surfacing
+The landing page uses server components to pull `/assets/hosts` and `/events/list` every 30 seconds, surfacing
 asset summaries and recent event activity in a shadcn-themed layout.
