@@ -59,13 +59,14 @@ export async function fetchFromBbot<T>(path: string, options?: RequestInit): Pro
   const baseUrl = (process.env.NEXT_PUBLIC_BBOT_API ?? "http://localhost:8807/v1").replace(/\/$/, "");
   const apiKey = process.env.NEXT_PUBLIC_BBOT_API_KEY;
 
-  const headers = new Headers(options?.headers);
+  const headers = new Headers(options?.headers ?? {});
   if (apiKey) headers.set("X-API-Key", apiKey);
 
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers,
-    next: { revalidate: 30 },
+    // BBOT payloads can exceed the Next.js data cache size; avoid caching to prevent 2MB limit errors.
+    cache: "no-store",
   });
 
   if (!response.ok) {
