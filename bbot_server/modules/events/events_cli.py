@@ -1,6 +1,6 @@
 import typer
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 from bbot.models.pydantic import Event
 from bbot_server.cli import common
@@ -62,6 +62,13 @@ class EventCTL(BaseBBCTL):
         file: Annotated[
             Path, typer.Option("--file", "-f", help="file to ingest (don't specify or use '-' to read from stdin)")
         ] = None,
+        forward_to_neo4j: Annotated[
+            Optional[bool],
+            typer.Option(
+                "--forward-to-neo4j/--no-forward-to-neo4j",
+                help="Override Neo4j forwarding for ingested events",
+            ),
+        ] = None,
     ):
         def event_generator():
             if file in (None, Path("-")):
@@ -77,7 +84,7 @@ class EventCTL(BaseBBCTL):
                     self.log.warning(f"Invalid event JSON: {line}: {e}")
 
         for count, event in enumerate(event_generator()):
-            self.bbot_server.insert_event(event)
+            self.bbot_server.insert_event(event, forward_to_neo4j=forward_to_neo4j)
             if count and count % 10 == 0:
                 self.log.info(f"Ingested {count:,} events")
 

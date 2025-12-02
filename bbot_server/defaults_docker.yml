@@ -36,3 +36,4 @@ agent:
     uri: bolt://172.17.0.1:7687
     username: neo4j
     password: bbotislife
+    forward_ingested_events: false
