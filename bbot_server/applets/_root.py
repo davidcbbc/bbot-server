@@ -56,7 +56,9 @@ class RootApplet(BaseApplet):
             await self.message_queue.setup()
 
             try:
-                self.neo4j_forwarder = build_forwarder(self._config.get("agent", {}).get("neo4j_output", {}))
+                self.neo4j_forwarder = build_forwarder(
+                    self._config.get("agent", {}).get("neo4j_output", {})
+                )
                 if self.neo4j_forwarder:
                     self.log.info("Neo4j forwarder enabled for ingested events")
             except Exception as e:

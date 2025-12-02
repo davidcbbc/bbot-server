@@ -41,12 +41,19 @@ class Neo4jForwarder:
         await self._driver.execute_query(cypher, uuid=event.uuid, props=payload, host=host)
 
 
-def build_forwarder(config: Optional[dict]):
+def build_forwarder(config: Optional[dict], *, force: bool = False):
+    """Construct a forwarder when Neo4j credentials are present.
+
+    When ``force`` is False, the ``forward_ingested_events`` flag must be
+    enabled in the config (the previous behavior). When ``force`` is True,
+    the flag is ignored so that per-request overrides can opt into
+    forwarding even if the default is disabled.
+    """
     if not config:
         return None
 
     enabled = config.get("forward_ingested_events", False)
-    if not enabled:
+    if not enabled and not force:
         return None
 
     uri = config.get("uri")

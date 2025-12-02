@@ -6,6 +6,7 @@ from typing import AsyncGenerator, Annotated, Optional
 from datetime import datetime, timezone, timedelta
 
 from bbot_server.applets.base import BaseApplet, api_endpoint
+from bbot_server.utils.neo4j_forwarder import build_forwarder
 
 
 NEO4J_FORWARD_TAG = "forward-to-neo4j"
@@ -27,8 +28,20 @@ class EventsApplet(BaseApplet):
         await self.event_store.insert_event(event)
 
         # best-effort forward to Neo4j when configured and allowed
+        should_forward = self._should_forward_to_neo4j(event)
         neo4j_forwarder = getattr(self.root, "neo4j_forwarder", None)
-        if neo4j_forwarder is not None and self._should_forward_to_neo4j(event):
+
+        if should_forward and neo4j_forwarder is None:
+            try:
+                neo4j_forwarder = build_forwarder(
+                    self.root._config.get("agent", {}).get("neo4j_output", {}),
+                    force=True,
+                )
+                self.root.neo4j_forwarder = neo4j_forwarder
+            except Exception as e:
+                self.log.error(f"Failed to initialize Neo4j forwarder for event {event.uuid}: {e}")
+
+        if neo4j_forwarder is not None and should_forward:
             try:
                 await neo4j_forwarder.forward_event(event)
             except Exception as e:

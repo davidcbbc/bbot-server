@@ -61,7 +61,8 @@ agent:
     forward_ingested_events: true
 ```
 
-You can also override Neo4j forwarding per ingest call without touching the config:
+You can also override Neo4j forwarding per ingest call without touching the config (just make sure `agent.neo4j_output.uri`,
+`username`, and `password` are configured so the server can connect on demand even if `forward_ingested_events` is `false`):
 
 - REST API: `POST /api/events/` accepts `?forward_to_neo4j=true|false` to force or skip forwarding for that request.
 - CLI: `bbctl event ingest --forward-to-neo4j` (or `--no-forward-to-neo4j`) toggles forwarding for all events read from the file/stdin stream.
