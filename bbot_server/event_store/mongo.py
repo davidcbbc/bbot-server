@@ -53,6 +53,11 @@ class MongoEventStore(BaseEventStore):
             raise BBOTServerNotFoundError(f"Event {uuid} not found")
         return event
 
+    async def _add_event_tag(self, uuid, tag):
+        result = await self.strict_collection.update_one({"uuid": uuid}, {"$addToSet": {"tags": tag}})
+        if result.matched_count == 0:
+            raise BBOTServerNotFoundError(f"Event {uuid} not found")
+
     async def _clear(self, confirm):
         if not confirm == f"WIPE {self.db_name}":
             raise ValueError("Confirmation failed")

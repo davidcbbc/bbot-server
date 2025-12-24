@@ -129,6 +129,35 @@ This tells `bbctl` (the client) where the server is, and gives it the means to a
 
 To utilise the API key and interact with the BBOT Server via the HTTP API, set the `X-API-Key` HTTP header to the value of a valid API key.
 
+### Mark false positives or ignore assets
+
+Use the CLI to quickly mark noisy findings as false positives or to hide assets that you want to ignore:
+
+```bash
+# Mark an asset as a false positive (adds the "false_positive" tag by default)
+bbctl asset tag example.evilcorp.com
+
+# Add a custom tag to an asset
+bbctl asset tag example.evilcorp.com --tag noisy_asset
+
+# Ignore an asset so it is filtered from normal queries
+bbctl asset ignore example.evilcorp.com
+
+# Remove the ignore flag if you want the asset to show up again
+bbctl asset ignore example.evilcorp.com --unignore
+
+# Tag an individual event (for example, a finding) as a false positive
+bbctl event tag 123e4567-e89b-12d3-a456-426614174000
+```
+
+Equivalent REST API endpoints are available if you prefer calling the server directly:
+
+- `POST /v1/assets/{host}/tag?tag=false_positive` — add a tag to an asset.
+- `POST /v1/assets/{host}/ignore?ignored=true` — ignore an asset (`ignored=false` to unignore).
+- `POST /v1/events/{uuid}/tag?tag=false_positive` — add a tag to an event.
+
+Each operation updates the asset or event in place so downstream tooling immediately reflects your false-positive or ignore decisions.
+
 ### Adding and Revoking API Keys
 
 API keys can be added and removed if you are on the server machine:

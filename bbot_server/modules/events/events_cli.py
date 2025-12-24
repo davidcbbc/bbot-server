@@ -101,3 +101,12 @@ class EventCTL(BaseBBCTL):
             event_tags = ", ".join(sorted(e.tags))
             event_tags = f"[{self.DARK_COLOR}]{event_tags}[/{self.DARK_COLOR}]"
             self.stdout.print(f"{timestamp} {event_type}: {event_data} ({event_tags})")
+
+    @subcommand(help="Add a tag to an event (default: false_positive)")
+    def tag(
+        self,
+        uuid: str,
+        tag: Annotated[str, typer.Option("--tag", "-t", help="Tag to add to the event")] = "false_positive",
+    ):
+        event = self.bbot_server.tag_event(uuid=uuid, tag=tag)
+        self.print_pydantic_json(event)
