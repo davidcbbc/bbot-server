@@ -51,26 +51,32 @@ class FindingsApplet(BaseApplet):
         if min_severity > max_severity:
             raise self.BBOTServerValueError("min_severity must be less than or equal to max_severity")
 
+        severity_query = {
+            "severity_score": {
+                "$gte": min_severity,
+                "$lte": max_severity,
+            },
+        }
+        if min_severity <= 1 <= max_severity:
+            severity_query = {
+                "$or": [
+                    severity_query,
+                    {"severity_score": {"$exists": False}},
+                    {"severity_score": None},
+                ],
+            }
+
         async for finding in self.root._get_assets(
             type="Finding",
             host=host,
             domain=domain,
             target_id=target_id,
-            query={
-                "$or": [
-                    {
-                        "severity_score": {
-                            "$gte": min_severity,
-                            "$lte": max_severity,
-                        },
-                    },
-                    {"severity_score": {"$exists": False}},
-                    {"severity_score": None},
-                ],
-            },
+            query=severity_query,
             search=search,
             sort=[("severity_score", -1)],
         ):
+            if "severity_score" not in finding:
+                finding["severity_score"] = SeverityScore.to_score(finding.get("severity", "INFO"))
             yield Finding(**finding)
 
     @api_endpoint(
