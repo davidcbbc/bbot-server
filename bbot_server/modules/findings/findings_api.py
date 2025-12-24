@@ -57,10 +57,16 @@ class FindingsApplet(BaseApplet):
             domain=domain,
             target_id=target_id,
             query={
-                "severity_score": {
-                    "$gte": min_severity,
-                    "$lte": max_severity,
-                },
+                "$or": [
+                    {
+                        "severity_score": {
+                            "$gte": min_severity,
+                            "$lte": max_severity,
+                        },
+                    },
+                    {"severity_score": {"$exists": False}},
+                    {"severity_score": None},
+                ],
             },
             search=search,
             sort=[("severity_score", -1)],
