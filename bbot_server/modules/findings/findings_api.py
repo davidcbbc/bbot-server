@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 
 from bbot_server.assets import CustomAssetFields
 from bbot_server.applets.base import BaseApplet, api_endpoint
-from bbot_server.modules.findings.findings_models import Finding, SEVERITY_COLORS, SeverityScore
+from bbot_server.modules.findings.findings_models import Finding, SEVERITY_COLORS, SEVERITY_LEVELS, SeverityScore
 
 
 # add 'findings' field to the main asset model
@@ -51,20 +51,25 @@ class FindingsApplet(BaseApplet):
         if min_severity > max_severity:
             raise self.BBOTServerValueError("min_severity must be less than or equal to max_severity")
 
+        severity_strings = [name for name, score in SEVERITY_LEVELS.items() if min_severity <= score <= max_severity]
         severity_query = {
-            "severity_score": {
-                "$gte": min_severity,
-                "$lte": max_severity,
-            },
+            "$or": [
+                {
+                    "severity_score": {
+                        "$gte": min_severity,
+                        "$lte": max_severity,
+                    },
+                },
+                {"severity": {"$in": severity_strings}},
+            ],
         }
         if min_severity <= 1 <= max_severity:
-            severity_query = {
-                "$or": [
-                    severity_query,
-                    {"severity_score": {"$exists": False}},
-                    {"severity_score": None},
-                ],
-            }
+            severity_query["$or"].extend(
+                [
+                    {"severity_score": {"$exists": False}, "severity": {"$exists": False}},
+                    {"severity_score": None, "severity": {"$exists": False}},
+                ]
+            )
 
         async for finding in self.root._get_assets(
             type="Finding",
@@ -75,7 +80,7 @@ class FindingsApplet(BaseApplet):
             search=search,
             sort=[("severity_score", -1)],
         ):
-            if "severity_score" not in finding:
+            if finding.get("severity_score") is None:
                 finding["severity_score"] = SeverityScore.to_score(finding.get("severity", "INFO"))
             yield Finding(**finding)
 
