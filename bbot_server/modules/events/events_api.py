@@ -2,10 +2,15 @@ import asyncio
 from fastapi import Query
 from contextlib import suppress
 from bbot.models.pydantic import Event
-from typing import AsyncGenerator, Annotated
+from typing import AsyncGenerator, Annotated, Optional
 from datetime import datetime, timezone, timedelta
 
 from bbot_server.applets.base import BaseApplet, api_endpoint
+from bbot_server.utils.neo4j_forwarder import build_forwarder
+
+
+NEO4J_FORWARD_TAG = "forward-to-neo4j"
+NEO4J_SKIP_TAG = "skip-neo4j-forward"
 
 
 class EventsApplet(BaseApplet):
@@ -22,11 +27,53 @@ class EventsApplet(BaseApplet):
         # write the event to the database
         await self.event_store.insert_event(event)
 
+        # best-effort forward to Neo4j when configured and allowed
+        should_forward = self._should_forward_to_neo4j(event)
+        neo4j_forwarder = getattr(self.root, "neo4j_forwarder", None)
+
+        if should_forward and neo4j_forwarder is None:
+            try:
+                neo4j_forwarder = build_forwarder(
+                    self.root._config.get("agent", {}).get("neo4j_output", {}),
+                    force=True,
+                )
+                self.root.neo4j_forwarder = neo4j_forwarder
+            except Exception as e:
+                self.log.error(f"Failed to initialize Neo4j forwarder for event {event.uuid}: {e}")
+
+        if neo4j_forwarder is not None and should_forward:
+            try:
+                await neo4j_forwarder.forward_event(event)
+            except Exception as e:
+                self.log.error(f"Error forwarding event {event.uuid} to Neo4j: {e}")
+
     @api_endpoint("/", methods=["POST"], summary="Insert a BBOT event into the asset database")
-    async def insert_event(self, event: Event):
+    async def insert_event(
+        self,
+        event: Event,
+        forward_to_neo4j: Annotated[
+            Optional[bool],
+            Query(
+                description=(
+                    "Override the server config for this request: forward (true) or skip (false)"
+                    " Neo4j mirroring for ingested events."
+                )
+            ),
+        ] = None,
+    ):
         """
         Insert a BBOT event into the asset database
         """
+        if forward_to_neo4j is not None:
+            tags = set(event.tags or [])
+            if forward_to_neo4j:
+                tags.discard(NEO4J_SKIP_TAG)
+                tags.add(NEO4J_FORWARD_TAG)
+            else:
+                tags.discard(NEO4J_FORWARD_TAG)
+                tags.add(NEO4J_SKIP_TAG)
+            event.tags = list(tags)
+
         # publish event to the message queue
         # it will be picked up by the watchdog and ingested
         await self.root.message_queue.publish_event(event)
@@ -81,3 +128,14 @@ class EventsApplet(BaseApplet):
         await self.event_store.archive_events(older_than=archive_after)
         # refresh asset database
         await self.root.assets.refresh_assets()
+
+    def _should_forward_to_neo4j(self, event: Event) -> bool:
+        tags = set(event.tags or [])
+
+        if NEO4J_SKIP_TAG in tags:
+            return False
+
+        if NEO4J_FORWARD_TAG in tags:
+            return True
+
+        return self.root._config.get("agent", {}).get("neo4j_output", {}).get("forward_ingested_events", False)
