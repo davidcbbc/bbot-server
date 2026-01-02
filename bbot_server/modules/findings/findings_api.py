@@ -68,6 +68,7 @@ class FindingsApplet(BaseApplet):
                 [
                     {"severity_score": {"$exists": False}, "severity": {"$exists": False}},
                     {"severity_score": None, "severity": {"$exists": False}},
+                    {"severity_score": {"$lte": 0}},
                 ]
             )
 
@@ -80,7 +81,7 @@ class FindingsApplet(BaseApplet):
             search=search,
             sort=[("severity_score", -1)],
         ):
-            if finding.get("severity_score") is None:
+            if finding.get("severity_score") in (None, 0):
                 finding["severity_score"] = SeverityScore.to_score(finding.get("severity", "INFO"))
             yield Finding(**finding)
 
