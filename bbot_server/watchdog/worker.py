@@ -10,6 +10,7 @@ from taskiq import TaskiqScheduler, TaskiqEvents, TaskiqState
 
 from bbot_server.modules import Asset
 from bbot.models.pydantic import Event
+from bbot.core.helpers.misc import extract_host
 from bbot_server.errors import BBOTServerNotFoundError
 from bbot_server.modules.activity.activity_models import Activity
 
@@ -87,7 +88,10 @@ class BBOTWatchdog:
             self.log.info(f"Received event: {event.type}{event_preview}")
             await self._send_event_alert(event)
             # get the event's associated asset (this saves on database queries since it will be passed down to each applet)
-            asset, _activities = await self._get_or_create_asset(event.host, event=event)
+            resolved_host = self._resolve_event_host(event)
+            if resolved_host and not event.host:
+                event.host = resolved_host
+            asset, _activities = await self._get_or_create_asset(resolved_host, event=event)
             activities.extend(_activities)
 
             # let each applet process the event
@@ -113,6 +117,31 @@ class BBOTWatchdog:
         except Exception as e:
             self.log.error(f"Error ingesting event {event.type}: {e}")
             self.log.error(traceback.format_exc())
+
+    def _resolve_event_host(self, event: Event) -> str | None:
+        if event.host:
+            return event.host
+
+        candidates = []
+        if event.netloc:
+            candidates.append(event.netloc)
+
+        event_data_json = getattr(event, "data_json", None) or {}
+        for key in ("host", "netloc", "url"):
+            value = event_data_json.get(key)
+            if value:
+                candidates.append(value)
+
+        event_data = getattr(event, "data", None)
+        if event_data:
+            candidates.append(event_data)
+
+        for candidate in candidates:
+            host, _, _ = extract_host(str(candidate))
+            if host:
+                return host
+
+        return None
 
     def _load_alert_config(self) -> None:
         """Load webhook alert configuration from the BBOT server config."""
