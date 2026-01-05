@@ -31,6 +31,9 @@ class BaseTarget(BaseBBOTServerModel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.seeds = self._clean_scope_list(self.seeds)
+        self.whitelist = None if self.whitelist is None else self._clean_scope_list(self.whitelist)
+        self.blacklist = self._clean_scope_list(self.blacklist)
         self._bbot_target = BBOTTarget(
             target=self.target, seeds=self.seeds, blacklist=self.blacklist, strict_dns_scope=self.strict_dns_scope
         )

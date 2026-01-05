@@ -6,6 +6,11 @@ import traceback
 from rich.console import Console
 from functools import cached_property
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+import bbot_server.config as bbcfg
 from bbot_server.cli.base import BaseBBCTL, Annotated, Option
 from bbot_server.errors import BBOTServerError, BBOTServerUnauthorizedError
 
