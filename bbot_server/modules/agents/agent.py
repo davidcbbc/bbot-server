@@ -8,7 +8,7 @@ from contextlib import suppress
 from typing import Callable, Any
 from urllib.parse import urlparse, urlunparse, urljoin
 
-import bbot_server.config as bbcfg
+from bbot_server.config import BBOT_SERVER_CONFIG as bbcfg
 from bbot.scanner import Scanner, Preset
 from bbot.scanner.dispatcher import Dispatcher
 from bbot.constants import get_scan_status_code, get_scan_status_name, SCAN_STATUS_NOT_STARTED, SCAN_STATUS_FAILED
@@ -17,9 +17,6 @@ from omegaconf import OmegaConf
 from bbot_server.errors import BBOTServerValueError
 from bbot_server.utils.async_utils import async_to_sync_class
 from bbot_server.modules.agents.agents_models import AgentResponse
-
-api_key = bbcfg.get_api_key()
-default_bbot_preset = bbcfg.BBOT_SERVER_CONFIG.get("agent", {}).get("base_preset", {})
 
 log = logging.getLogger("bbot_server.agent")
 
@@ -62,6 +59,10 @@ class BBOTAgent:
 
     def __init__(self, id: str, name: str, config, enable_neo4j_output: bool = False):
         self.log = logging.getLogger("bbot_server.agent")
+        if not id:
+            raise BBOTServerValueError("Agent ID is required")
+        if not name:
+            raise BBOTServerValueError("Agent name is required")
         self.id = id
         self.name = name
         self.config = config
@@ -123,14 +124,14 @@ class BBOTAgent:
 
         try:
             preset_obj = Preset.from_dict(preset)
-            agent_preset.merge(preset_obj)
+            preset_obj.merge(agent_preset)
         except BaseException as e:
             return {"status": "error", "message": f"Error parsing preset: {e} - {traceback.format_exc()}"}
 
         try:
             # create scanner
             scan = Scanner(
-                preset=agent_preset,
+                preset=preset_obj,
                 scan_id=scan_id,
                 dispatcher=self.dispatcher,
             )
@@ -214,7 +215,7 @@ class BBOTAgent:
 
     def make_agent_preset(self):
         # default BBOT preset from bbot server YAML config
-        default_preset = Preset.from_dict(default_bbot_preset)
+        default_preset = Preset.from_dict(bbcfg.agent.base_preset)
 
         # agent-specific overrides for output url etc.
         output_modules = ["http"]
@@ -252,7 +253,7 @@ class BBOTAgent:
                 # https://websockets.readthedocs.io/en/stable/reference/asyncio/client.html
                 try:
                     async with websockets.connect(
-                        self.websocket_dock_url, additional_headers={bbcfg.API_KEY_NAME: api_key}
+                        self.websocket_dock_url, additional_headers={bbcfg.auth_header: str(bbcfg.get_api_key())}
                     ) as websocket:
                         self.log.info(f"Agent {self.name} successfully connected to {self.websocket_dock_url}")
                         self.websocket = websocket
