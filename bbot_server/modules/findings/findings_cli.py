@@ -58,3 +58,25 @@ class FindingCTL(BaseBBCTL):
                 self.timestamp_to_human(finding.modified),
             )
         self.stdout.print(table)
+
+    @subcommand(help="Mark a finding as ignored/false-positive or undo the flag")
+    def ignore(
+        self,
+        id: Annotated[str, typer.Argument(help="Finding ID to update")],
+        unignore: Annotated[
+            bool, typer.Option("--unignore", "-u", help="Remove the ignored flag instead of adding it")
+        ] = False,
+        json: common.json = False,
+    ):
+        updated = self.bbot_server.set_finding_ignored(id=id, ignored=not unignore)
+
+        if json:
+            self.print_pydantic_json(updated)
+            return
+
+        status = "ignored (false positive)" if not unignore else "unignored"
+        severity_color = SEVERITY_COLORS[updated.severity_score]
+        self.stdout.print(
+            f"Finding [bold]{updated.name}[/bold] on [bold]{updated.host}[/bold] marked as {status}. "
+            f"Severity: [{severity_color}]{updated.severity}[/{severity_color}]"
+        )

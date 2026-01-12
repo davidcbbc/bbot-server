@@ -1,5 +1,6 @@
 from bbot_server.config import BBOT_SERVER_CONFIG as bbcfg
 from bbot_server.applets.base import BaseApplet
+from bbot_server.utils.neo4j_forwarder import build_forwarder
 
 
 class RootApplet(BaseApplet):
@@ -18,6 +19,7 @@ class RootApplet(BaseApplet):
         super().__init__(**kwargs)
         self._interface_type = "python"
         self._mcp = None
+        self.neo4j_forwarder = None
 
     async def setup(self):
         # don't try to set up database/message queues if we're connected to a remote instance
@@ -42,6 +44,13 @@ class RootApplet(BaseApplet):
             self.message_queue = MessageQueue()
             await self.message_queue.setup()
 
+            try:
+                self.neo4j_forwarder = build_forwarder(self._config.get("agent", {}).get("neo4j_output", {}))
+                if self.neo4j_forwarder:
+                    self.log.info("Neo4j forwarder enabled for ingested events")
+            except Exception as e:
+                self.log.error(f"Failed to initialize Neo4j forwarder: {e}")
+
         await self._setup()
         return True, ""
 
@@ -55,6 +64,8 @@ class RootApplet(BaseApplet):
 
     async def cleanup(self):
         if self.is_native:
+            if self.neo4j_forwarder:
+                await self.neo4j_forwarder.close()
             await self.asset_store.cleanup()
             await self.user_store.cleanup()
             await self.event_store.cleanup()

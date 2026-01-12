@@ -50,6 +50,8 @@ bbctl server start
 
 Agents can mirror scan events into a Neo4j database alongside the BBOT server output. Start the agent with `--neo4j-output` and configure the connection details under `agent.neo4j_output` in your BBOT server config (e.g. `~/.config/bbot_server/config.yml`).
 
+If you want events ingested directly into the server (for example via `bbctl event ingest` or POSTing to `/api/events/`) to land in Neo4j as well, set `agent.neo4j_output.forward_ingested_events: true` in the server config. With that flag enabled, the server mirrors ingested events to Neo4j using the same connection details—even when the ingest is not coming from a running agent (requires the Python `neo4j` driver to be installed).
+
 ```bash
 bbctl agent start --id <AGENT_ID> --name <AGENT_NAME> --neo4j-output
 ```
@@ -217,6 +219,51 @@ If you forgot to output a scan to BBOT server, you can easily ingest it after th
 cat ~/.bbot/scans/demonic_jimmy/output.json | bbctl event ingest
 ```
 
+### Example FINDING event (VPN darkweb intel)
+
+You can also craft a FINDING event manually to tag an asset when darkweb chatter is discovered. The structure mirrors normal BBOT events (ID/UUID, scope metadata, tags, discovery context, etc.). For example, to record a HIGH-severity VPN-related finding for the `euronext.com` domain:
+
+```bash
+cat <<'EOF' | bbctl event ingest
+{
+  "type": "FINDING",
+  "id": "FINDING:a7c4f2f0c5064a0b9d8f0c1a2e3f4455e12a7c01",
+  "uuid": "FINDING:4c6b3d32-3df7-4b8c-b9e2-6f6c8abf1c2d",
+  "scope_description": "in-scope",
+  "netloc": "vpn.euronext.com",
+  "data": {
+    "host": "vpn.euronext.com",
+    "name": "Darkweb: vpn.euronext.com credential sale",
+    "description": "Forum post advertising VPN access tied to euronext.com; credentials offered for sale.",
+    "severity": "HIGH",
+    "confidence": 3,
+    "cves": []
+  },
+  "host": "vpn.euronext.com",
+  "resolved_hosts": ["145.226.52.10", "145.226.52.11"],
+  "dns_children": {},
+  "web_spider_distance": 0,
+  "scope_distance": 0,
+  "scan": "SCAN:665173a31483fb8dc06cac275e9c5a6ceae023d0",
+  "timestamp": "2025-09-04T09:10:32.091861+00:00",
+  "parent": "DNS_NAME:d2c6ef7ab2b14f9e96b5e6e74f1f9c7f82bb6f2d",
+  "parent_uuid": "DNS_NAME:b08f51b8-8d72-4e58-a3e6-5388c734d3d4",
+  "tags": ["vpn", "darkweb-intel", "in-scope"],
+  "module": "threat_intel_manual",
+  "module_sequence": "manual_ingest",
+  "discovery_context": "Analyst observed VPN credentials for vpn.euronext.com advertised on darkweb forum",
+  "discovery_path": [
+    "Manual threat-intel review",
+    "Darkweb post referencing vpn.euronext.com VPN access"
+  ],
+  "parent_chain": [
+    "DNS_NAME:b08f51b8-8d72-4e58-a3e6-5388c734d3d4",
+    "FINDING:4c6b3d32-3df7-4b8c-b9e2-6f6c8abf1c2d"
+  ]
+}
+EOF
+```
+
 ## Start a scan (through BBOT server)
 
 To start a scan in BBOT server, you need to first create a **Preset** and **Target**.
@@ -382,6 +429,12 @@ bbctl finding list
 
 # Search findings for a certain string
 bbctl finding list --search "IIS"
+
+# Mark a finding as a false positive (ignored)
+bbctl finding ignore <finding-id>
+
+# Remove the ignored flag if it was set in error
+bbctl finding ignore <finding-id> --unignore
 ```
 
 ### Statistics

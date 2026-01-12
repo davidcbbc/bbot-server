@@ -1,7 +1,7 @@
 from fastapi import Body, Query
 from typing import Annotated, Optional
 
-from bbot_server.assets import CustomAssetFields
+from bbot_server.assets import Asset, CustomAssetFields
 from bbot_server.applets.base import BaseApplet, api_endpoint
 from bbot_server.modules.findings.findings_models import Finding, SEVERITY_COLORS, SeverityScore
 
@@ -198,6 +198,81 @@ class FindingsApplet(BaseApplet):
             findings[severity] = findings.get(severity, 0) + 1
         findings = dict(sorted(findings.items(), key=lambda x: x[1], reverse=True))
         return findings
+
+    @api_endpoint(
+        "/{id}/ignore",
+        methods=["POST"],
+        summary="Mark a finding as ignored (false positive) or undo the ignore flag",
+    )
+    async def set_finding_ignored(
+        self,
+        id: str,
+        ignored: Annotated[
+            bool,
+            Query(
+                description="Set to true to mark as false positive/ignored, false to restore",
+            ),
+        ] = True,
+    ) -> Finding:
+        finding = await self.root._get_asset(type="Finding", query={"id": id})
+        if not finding:
+            raise self.BBOTServerNotFoundError("Finding not found")
+
+        if finding.get("ignored") != ignored:
+            await self.collection.update_one(
+                {"id": id},
+                {
+                    "$set": {
+                        "ignored": ignored,
+                        "modified": self.helpers.utc_now(),
+                    }
+                },
+            )
+            await self._update_asset_finding_summary(host=finding.get("host"))
+
+        updated_finding = await self.root._get_asset(type="Finding", query={"id": id})
+        return Finding(**updated_finding)
+
+    async def _update_asset_finding_summary(self, host: str):
+        if not host:
+            return
+
+        asset_doc = await self.root._get_asset(host=host)
+        if not asset_doc:
+            return
+
+        findings = []
+        async for finding in self._get_assets(
+            host=host,
+            type="Finding",
+            archived=False,
+            ignored=False,
+        ):
+            findings.append(finding)
+
+        asset = Asset(**asset_doc)
+        finding_names = {f.get("name") for f in findings if f.get("name")}
+        severity_counts: dict[str, int] = {}
+
+        for finding in findings:
+            severity_score = finding.get("severity_score")
+            if severity_score is None:
+                severity_score = SeverityScore.to_score(finding.get("severity", "INFO"))
+            severity = SeverityScore.to_severity(severity_score)
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+        asset.findings = sorted(finding_names)
+        asset.finding_severities = dict(sorted(severity_counts.items(), key=lambda x: x[1], reverse=True))
+
+        if severity_counts:
+            max_severity_score = max(SeverityScore.to_score(sev) for sev in severity_counts)
+            asset.finding_max_severity_score = max_severity_score
+            asset.finding_max_severity = SeverityScore.to_severity(max_severity_score)
+        else:
+            asset.finding_max_severity_score = 0
+            asset.finding_max_severity = None
+
+        await self.root.assets.update_asset(asset)
 
     async def handle_event(self, event, asset):
         name = event.data_json["name"]
